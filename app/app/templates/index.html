@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Data</title>
+    <link href="../static/css/materialize.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="../static/js/materialize.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../static/css/main.css">
+    <link rel="stylesheet" href="../static/css/tab.css">
+    <script src="../static/js/tab.js"></script>
+
+</head>
+
+<body>
+    <div class="content">
+        <h1>Network Traffic Data</h1>
+        <div class="input-field">
+            <input type="text" id="search" placeholder="Search">
+            <label for="search">Search</label>
+	</div> 
+        <div class="tabs">
+            <button class="tab-links" onclick="openTab(event, 'Table')">Recent Payloads</button>
+            <button class="tab-links" onclick="openTab(event, 'Chart')">Protocol Statistics</button>
+        </div>
+        <div class="container">
+            <div id="Table" class="tab-content">
+                <table id="payloadTable" class="highlight">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Source IP</th>
+                            <th>Destination IP</th>
+                            <th>Protocol</th>
+                            <th>Payload</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data will be populated here -->
+                    </tbody>
+                </table>
+                <ul class="pagination">
+                    <li class="waves-effect"><a href="#!" id="prevPage"><i class="material-icons">chevron_left</i></a></li>
+                    <li class="waves-effect"><a href="#!" id="nextPage"><i class="material-icons">chevron_right</i></a></li>
+                </ul>
+            </div>
+            <div id="Chart" class="tab-content" style="display:none;">
+                <canvas id="trafficChart"></canvas>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+    });
+
+    let currentPage = 0;
+    const limit = 10;
+
+    async function fetchData(page = 0, query = '') {
+        const response = await fetch(`/api/data?limit=${limit}&offset=${page * limit}&query=${query}`);
+        return await response.json();
+    }
+
+    async function fetchStats() {
+        const response = await fetch('/api/stats');
+        return await response.json();
+    }
+
+    function updateTable(data) {
+        const tableBody = document.getElementById('payloadTable').getElementsByTagName('tbody')[0];
+        tableBody.innerHTML = '';
+        data.forEach(row => {
+            const newRow = tableBody.insertRow();
+            const timestampCell = newRow.insertCell(0);
+            const srcIpCell = newRow.insertCell(1);
+            const dstIpCell = newRow.insertCell(2);
+            const protocolCell = newRow.insertCell(3);
+            const payloadCell = newRow.insertCell(4);
+
+            timestampCell.textContent = row.timestamp;
+            srcIpCell.textContent = row.src_ip;
+            dstIpCell.textContent = row.dst_ip;
+            protocolCell.textContent = row.protocol;
+            payloadCell.textContent = row.payload;
+        });
+    }
+
+    function updateChart(data) {
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        const labels = data.map(item => item.protocol);
+        const values = data.map(item => item.count);
+
+        if (window.myChart) {
+            window.myChart.data.labels = labels;
+            window.myChart.data.datasets[0].data = values;
+            window.myChart.update();
+        } else {
+            window.myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '# of Packets',
+                        data: values,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    async function refreshData(page = 0, query = '') {
+        const data = await fetchData(page, query);
+        updateTable(data);
+        const stats = await fetchStats();
+        updateChart(stats);
+    }
+
+    document.getElementById('nextPage').addEventListener('click', () => {
+        currentPage++;
+        refreshData(currentPage, document.getElementById('search').value);
+    });
+
+    document.getElementById('prevPage').addEventListener('click', () => {
+        if (currentPage > 0) {
+            currentPage--;
+            refreshData(currentPage, document.getElementById('search').value);
+        }
+    });
+
+    document.getElementById('search').addEventListener('input', () => {
+        refreshData(0, document.getElementById('search').value);
+    });
+
+    // Initial data load
+    refreshData();
+    setInterval(() => refreshData(currentPage, document.getElementById('search').value), 5000);
+</script>
+</html> 

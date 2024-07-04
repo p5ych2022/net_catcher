@@ -1,0 +1,47 @@
+version: '2.1'
+
+
+services:
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: 1ds
+      MYSQL_DATABASE: traffic_data  
+      MYSQL_USER: ids               
+      MYSQL_PASSWORD: 1ds  
+    volumes:
+      - ./mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql  
+    networks:
+      - mysql_network
+    ports:
+      - "3306:3306"
+  net_catcher:
+    build:
+      context: ./net_catcher  
+      dockerfile: Dockerfile
+    image: net_catcher
+    network_mode: "host"  
+    privileged: true  # 设置特权模式,存在容器逃逸风险
+    cap_add:
+      - NET_ADMIN  
+    depends_on:
+      - mariadb  
+
+  app:
+    build:
+      context: ./app  
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"  
+    environment:
+      - FLASK_APP=app.py
+    networks:
+      - mysql_network 
+    depends_on:
+      - mariadb  
+    
+    
+
+networks:
+  mysql_network:
+    driver: bridge  # 使用桥接模式
